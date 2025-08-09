@@ -42,8 +42,8 @@ async def call_model(query, k):
     model = genai.GenerativeModel("gemini-2.5-flash")
     resp = await model.generate_content_async(prompt)
     resp = json_pat.findall(resp.text)
-    return resp[0] if len(resp) > 0 else []
-    
+    return json.loads(resp[0]) if len(resp) > 0 else []
+
 @app.post("/api/event-agent/search", response_model=List[SearchResponse])
 async def search(request: Request):
 
