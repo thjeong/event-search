@@ -1,4 +1,4 @@
-import os, re, json
+import os, re, json, asyncio
 from typing import List, Dict, Any, Optional
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
@@ -12,14 +12,14 @@ POOL_SIZE = 5
 event_pool = []
 for k in range(POOL_SIZE):
     index_of_k = [idx for idx in range(len(event_list)) if idx % POOL_SIZE == k]
-    print(k, index_of_k)
+    #print(k, index_of_k)
     event_pool.append([event_list[idx] for idx in index_of_k])
 
 # API 키 설정
 genai.configure(api_key=os.environ.get("GOOGLE_API_KEY"))  # 👉 본인의 API 키로 교체
 
 # 모델 인스턴스 생성
-model = genai.GenerativeModel("gemini-2.5-flash")
+#model = genai.GenerativeModel("gemini-2.5-flash")
 
 # Pydantic 모델 정의
 class Request(BaseModel):
@@ -37,13 +37,19 @@ app = FastAPI(
     version="1.0.0"
 )
 
+async def call_model(query, k):
+    prompt = query + """ - 목록에서 해당하는 event만 뽑아줘. 다른 말은 하지마 : """ + str(event_pool[k])
+    model = genai.GenerativeModel("gemini-2.5-flash")
+    resp = await model.generate_content_async(prompt)
+    return json_pat.findall(resp.text)[0]
+
 @app.post("/api/event-agent/search", response_model=List[SearchResponse])
 async def search(request: Request):
-    
+
     query = request.query
-    resp = model.generate_content(query + """ - 목록에서 해당하는 event만 뽑아줘. 다른 말은 하지마 : """ + str(event_pool[0]))
-    
-    return [SearchResponse(item) for item in json_pat.findall(resp.text)[0]]
+    results = await asyncio.gather(*(call_model(query, k) for k in range(POOL_SIZE)))
+    results = [item for sublist in results for item in sublist]  # flatten
+    return [SearchResponse(**item) for item in results]
 
 @app.get("/health")
 def health():
