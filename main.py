@@ -41,8 +41,9 @@ async def call_model(query, k):
     prompt = query + """ - 목록에서 해당하는 event만 뽑아줘. 다른 말은 하지마 : """ + str(event_pool[k])
     model = genai.GenerativeModel("gemini-2.5-flash")
     resp = await model.generate_content_async(prompt)
-    return json_pat.findall(resp.text)[0]
-
+    resp = json_pat.findall(resp.text)
+    return resp[0] if len(resp) > 0 else []
+    
 @app.post("/api/event-agent/search", response_model=List[SearchResponse])
 async def search(request: Request):
 
