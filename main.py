@@ -3,8 +3,9 @@ from typing import List, Dict, Any, Optional
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import google.generativeai as genai
+from utils import parse_lenient_json
 
-json_pat = re.compile(r'(\{.*?\}|\[.*?\])', re.DOTALL)
+#json_pat = re.compile(r'(\{.*?\}|\[.*?\])', re.DOTALL)
 
 event_list = json.loads(open('resources/event_list.json', 'r').read())
 
@@ -41,7 +42,7 @@ async def call_model(query, k):
     prompt = query + """ - 목록에서 해당하는 event만 뽑아줘. 다른 말은 하지마 : """ + str(event_pool[k])
     model = genai.GenerativeModel("gemini-2.5-flash")
     resp = await model.generate_content_async(prompt)
-    resp = json_pat.findall(resp.text)
+    resp = parse_lenient_json(resp.text)
     return json.loads(resp[0]) if len(resp) > 0 else []
 
 @app.post("/api/event-agent/search", response_model=List[SearchResponse])
