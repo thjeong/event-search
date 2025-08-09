@@ -1,8 +1,19 @@
-import os
+import os, re, json
 from typing import List, Dict, Any, Optional
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import google.generativeai as genai
+
+json_pat = re.compile(r'(\{.*?\}|\[.*?\])', re.DOTALL)
+
+event_list = json.loads(open('resources/event_list.json', 'r').read())
+
+POOL_SIZE = 5
+event_pool = []
+for k in range(POOL_SIZE):
+    index_of_k = [idx for idx in range(len(event_list)) if idx % POOL_SIZE == k]
+    print(k, index_of_k)
+    event_pool.append([event_list[idx] for idx in index_of_k])
 
 # API 키 설정
 genai.configure(api_key=os.environ.get("GOOGLE_API_KEY"))  # 👉 본인의 API 키로 교체
@@ -26,11 +37,13 @@ app = FastAPI(
     version="1.0.0"
 )
 
-@app.post("/api/event-agent/search", response_model=SearchResponse)
+@app.post("/api/event-agent/search", response_model=List[SearchResponse])
 async def search(request: Request):
+    
     query = request.query
-    summary = model.generate_content(query)
-    return SearchResponse(response=summary.text)
+    resp = model.generate_content(query + """ - 목록에서 해당하는 event만 뽑아줘. 다른 말은 하지마 : """ + str(event_pool[0]))
+    
+    return [SearchResponse(item) for item in json_pat.findall(resp.text)[0]]
 
 @app.get("/health")
 def health():
